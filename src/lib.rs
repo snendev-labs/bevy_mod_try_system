@@ -366,4 +366,24 @@ mod tests {
             vec![Output::Regular, Output::Regular,]
         );
     }
+
+    #[derive(Clone, Debug, PartialEq, Eq, Hash, SystemSet)]
+    struct MySystems;
+
+    #[test]
+    fn run_pipe_err_and_in_set() {
+        let mut world = World::new();
+        world.init_resource::<ErrorBucket>();
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(
+            || -> TestResult { Ok(()) }
+                .pipe_err(handle_errors)
+                .in_set(MySystems),
+        );
+
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
+    }
 }

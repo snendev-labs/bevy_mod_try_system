@@ -1,5 +1,5 @@
 [package]
-name = "bevy_try_system"
+name = "bevy_mod_try_system"
 version = "0.1.0"
 edition = "2021"
 

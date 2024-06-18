@@ -191,7 +191,7 @@ mod tests {
     #[test]
     fn run_try_and_pipe_systems() {
         let mut world = World::new();
-        world.insert_resource(Outputs::default());
+        world.init_resource::<Outputs>();
         let mut schedule = Schedule::default();
 
         schedule.add_systems(
@@ -234,7 +234,7 @@ mod tests {
     #[test]
     fn run_map_and_pipe_systems() {
         let mut world = World::new();
-        world.insert_resource(Outputs::default());
+        world.init_resource::<Outputs>();
         let mut schedule = Schedule::default();
 
         schedule.add_systems(
@@ -291,7 +291,7 @@ mod tests {
     #[test]
     fn run_pipe_nested_results() {
         let mut world = World::new();
-        world.insert_resource(Outputs::default());
+        world.init_resource::<Outputs>();
         let mut schedule = Schedule::default();
 
         schedule.add_systems(

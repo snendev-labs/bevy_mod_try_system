@@ -325,4 +325,45 @@ mod tests {
             ]
         );
     }
+
+    fn make_fallback_option<E: std::fmt::Debug, T>(In(error): In<E>) -> Option<T> {
+        bevy::log::error!("{error:?}");
+        None
+    }
+
+    fn collect_options(In(output): In<Option<Output>>, mut outputs: ResMut<Outputs>) {
+        if output.is_some() {
+            outputs.0.push(output.unwrap());
+        }
+    }
+
+    #[test]
+    fn run_try_and_map_and_pipe_systems() {
+        let mut world = World::new();
+        world.insert_resource(Outputs::default());
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(
+            alternate_output
+                .map(|result| result.map(|val| Some(val)))
+                .pipe_err(make_fallback_option)
+                .pipe(collect_options),
+        );
+
+        assert_eq!(world.resource::<Outputs>().0, vec![]);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<Outputs>().0, vec![Output::Regular]);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<Outputs>().0, vec![Output::Regular]);
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Regular]
+        );
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Regular,]
+        );
+    }
 }

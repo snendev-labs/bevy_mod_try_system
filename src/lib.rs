@@ -52,8 +52,8 @@ pub struct TryMarker<R, E> {
 impl<R, E> Default for TryMarker<R, E> {
     fn default() -> Self {
         Self {
-            marker_error: PhantomData::default(),
-            marker_ok: PhantomData::default(),
+            marker_ok: PhantomData::<R>,
+            marker_error: PhantomData::<E>,
         }
     }
 }
@@ -73,7 +73,7 @@ where
         a: impl FnOnce(<A as System>::In) -> <A as System>::Out,
         b: impl FnOnce(<B as System>::In) -> <B as System>::Out,
     ) -> Self::Out {
-        a(input).unwrap_or_else(|input| b(input))
+        a(input).unwrap_or_else(b)
     }
 }
 

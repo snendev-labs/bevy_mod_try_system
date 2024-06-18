@@ -160,12 +160,13 @@ mod tests {
     #[derive(Debug, PartialEq, Eq)]
     enum Output {
         Regular,
-        Fallback,
+        Fallback1,
+        Fallback2,
     }
 
-    type TestResult2 = Result<Output, TestError>;
+    type TestOutputResult = Result<Output, TestError>;
 
-    fn alternate_output(mut counter: Local<usize>) -> TestResult2 {
+    fn alternate_output(mut counter: Local<usize>) -> TestOutputResult {
         *counter += 1;
         if *counter % 2 == 1 {
             Ok(Output::Regular)
@@ -174,9 +175,9 @@ mod tests {
         }
     }
 
-    fn make_fallback_output(In(error): In<TestError>) -> Output {
+    fn make_fallback_output<E: std::fmt::Debug>(In(error): In<E>) -> Output {
         bevy::log::error!("{error:?}");
-        Output::Fallback
+        Output::Fallback1
     }
 
     #[derive(Default, Resource)]
@@ -186,6 +187,7 @@ mod tests {
         outputs.0.push(output);
     }
 
+    // Test that pipe_err preserves out types and can be piped from
     #[test]
     fn run_try_and_pipe_systems() {
         let mut world = World::new();
@@ -204,21 +206,122 @@ mod tests {
         schedule.run(&mut world);
         assert_eq!(
             world.resource::<Outputs>().0,
-            vec![Output::Regular, Output::Fallback]
+            vec![Output::Regular, Output::Fallback1]
         );
         schedule.run(&mut world);
         assert_eq!(
             world.resource::<Outputs>().0,
-            vec![Output::Regular, Output::Fallback, Output::Regular]
+            vec![Output::Regular, Output::Fallback1, Output::Regular]
         );
         schedule.run(&mut world);
         assert_eq!(
             world.resource::<Outputs>().0,
             vec![
                 Output::Regular,
-                Output::Fallback,
+                Output::Fallback1,
                 Output::Regular,
-                Output::Fallback
+                Output::Fallback1
+            ]
+        );
+    }
+
+    fn make_fallback_string(In(error): In<String>) -> Output {
+        bevy::log::error!("{error:?}");
+        Output::Fallback1
+    }
+
+    // Test that mapping before piping into the system also works
+    #[test]
+    fn run_map_and_pipe_systems() {
+        let mut world = World::new();
+        world.insert_resource(Outputs::default());
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(
+            alternate_output
+                .map(|result| result.map_err(|err| format!("{err:?}")))
+                .pipe_err(make_fallback_string)
+                .pipe(collect_output),
+        );
+
+        assert_eq!(world.resource::<Outputs>().0, vec![]);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<Outputs>().0, vec![Output::Regular]);
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Fallback1]
+        );
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Fallback1, Output::Regular]
+        );
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![
+                Output::Regular,
+                Output::Fallback1,
+                Output::Regular,
+                Output::Fallback1
+            ]
+        );
+    }
+
+    #[derive(Debug)]
+    struct OtherTestError;
+    type NestedTestResult = Result<TestOutputResult, OtherTestError>;
+
+    fn nested_increment(mut counter: Local<Counter>) -> NestedTestResult {
+        counter.0 += 1;
+        match (counter.0 - 1) % 3 {
+            0 => Ok(Ok(Output::Regular)),
+            1 => Ok(Err(TestError)),
+            2 => Err(OtherTestError),
+            _ => unreachable!(""),
+        }
+    }
+
+    fn make_fallback_result<E: std::fmt::Debug>(In(error): In<E>) -> TestOutputResult {
+        bevy::log::error!("{error:?}");
+        Ok(Output::Fallback2)
+    }
+
+    #[test]
+    fn run_pipe_nested_results() {
+        let mut world = World::new();
+        world.insert_resource(Outputs::default());
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(
+            nested_increment
+                .pipe_err(make_fallback_result)
+                .pipe_err(make_fallback_output)
+                .pipe(collect_output),
+        );
+
+        assert_eq!(world.resource::<Outputs>().0, vec![]);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<Outputs>().0, vec![Output::Regular]);
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Fallback1]
+        );
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![Output::Regular, Output::Fallback1, Output::Fallback2]
+        );
+        schedule.run(&mut world);
+        assert_eq!(
+            world.resource::<Outputs>().0,
+            vec![
+                Output::Regular,
+                Output::Fallback1,
+                Output::Fallback2,
+                Output::Regular,
             ]
         );
     }

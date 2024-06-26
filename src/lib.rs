@@ -1,43 +1,61 @@
 use std::{borrow::Cow, marker::PhantomData};
 
 use bevy::{
-    ecs::system::{CombinatorSystem, Combine},
+    ecs::system::{AdapterSystem, CombinatorSystem, Combine},
     prelude::{IntoSystem, System},
 };
 
-/// Invokes [`Not`] with the output of another system.
-///
-/// See [`common_conditions::not`] for examples.
-///
-///
+/// A CombinatorSystem for systems that return Results and handle errors.
 pub type TrySystem<A, B, R, E> = CombinatorSystem<TryMarker<R, E>, A, B>;
+
+/// An AdapterSystem for systems that return Results and want to log errors.
+pub type LogErrorsSystem<S, In, Out, Err, Marker> =
+    AdapterSystem<fn(Result<Out, Err>), <S as IntoSystem<In, Result<Out, Err>, Marker>>::System>;
 
 /// Any system that outputs a Result is a TrySystem.
 ///
 /// Implemented for functions and closures that convert into [`System<Out=Result<R,E>`](System).
 ///
 /// See similar implementations in the Bevy documentation https://github.com/bevyengine/bevy/blob/main/crates/bevy_ecs/src/schedule/condition.rs#L1240.
-pub trait TrySystemExt<In, Marker, R, E>: IntoSystem<In, Result<R, E>, Marker>
+pub trait TrySystemExt<In, Out, Err, M1>
 where
-    R: Send + Sync + 'static,
-    E: std::fmt::Debug + Send + Sync + 'static,
+    Out: Send + Sync + 'static,
+    Err: Send + Sync + 'static,
 {
-    fn pipe_err<B: IntoSystem<E, R, M>, M>(
+    fn pipe_err<ErrSys, M2>(
         self,
-        other: B,
-    ) -> TrySystem<Self::System, B::System, R, E> {
+        other: ErrSys,
+    ) -> TrySystem<Self::System, ErrSys::System, Out, Err>
+    where
+        Self: IntoSystem<In, Result<Out, Err>, M1>,
+        ErrSys: IntoSystem<Err, Out, M2>,
+    {
         let a = IntoSystem::into_system(self);
         let b = IntoSystem::into_system(other);
         let name = format!("{} (err -> {})", a.name(), b.name());
         CombinatorSystem::new(a, b, Cow::Owned(name))
     }
+
+    fn log_err(self) -> LogErrorsSystem<Self, In, Out, Err, M1>
+    where
+        Self: IntoSystem<In, Result<Out, Err>, M1>,
+        Err: std::fmt::Debug,
+    {
+        self.map(log_error as fn(Result<Out, Err>))
+    }
 }
 
-impl<F, In, Marker, R, E> TrySystemExt<In, Marker, R, E> for F
+fn log_error<R, E: std::fmt::Debug>(result: Result<R, E>) {
+    if let Err(error) = result {
+        bevy::log::error!("{error:?}");
+    }
+}
+
+impl<F, In, Out, Err, Marker> TrySystemExt<In, Out, Err, Marker> for F
 where
-    F: IntoSystem<In, Result<R, E>, Marker>,
-    R: Send + Sync + 'static,
-    E: std::fmt::Debug + Send + Sync + 'static,
+    F: IntoSystem<In, Result<Out, Err>, Marker>,
+    Out: Send + Sync + 'static,
+    Err: Send + Sync + 'static,
 {
 }
 
@@ -63,7 +81,7 @@ where
     A: System<Out = Result<R, E>>,
     B: System<In = E, Out = R>,
     R: Send + Sync + 'static,
-    E: std::fmt::Debug + Send + Sync + 'static,
+    E: Send + Sync + 'static,
 {
     type In = A::In;
     type Out = R;
@@ -112,7 +130,7 @@ mod tests {
         }
     }
 
-    fn handle_errors(In(error): In<TestError>, mut errors: ResMut<ErrorBucket>) {
+    fn handle_error(In(error): In<TestError>, mut errors: ResMut<ErrorBucket>) {
         errors.0.push(error);
     }
 
@@ -123,8 +141,8 @@ mod tests {
         world.init_resource::<ErrorBucket>();
         let mut schedule = Schedule::default();
 
-        schedule.add_systems(succeed_increment.pipe_err(handle_errors));
-        schedule.add_systems(fail_increment.pipe_err(handle_errors));
+        schedule.add_systems(succeed_increment.pipe_err(handle_error));
+        schedule.add_systems(fail_increment.pipe_err(handle_error));
 
         schedule.run(&mut world);
         assert_eq!(world.resource::<Counter>().0, 1);
@@ -141,7 +159,7 @@ mod tests {
         world.init_resource::<ErrorBucket>();
         let mut schedule = Schedule::default();
 
-        schedule.add_systems(alternate_increment.pipe_err(handle_errors));
+        schedule.add_systems(alternate_increment.pipe_err(handle_error));
 
         schedule.run(&mut world);
         assert_eq!(world.resource::<Counter>().0, 1);
@@ -378,12 +396,51 @@ mod tests {
 
         schedule.add_systems(
             || -> TestResult { Ok(()) }
-                .pipe_err(handle_errors)
+                .pipe_err(handle_error)
                 .in_set(MySystems),
         );
 
         assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
         schedule.run(&mut world);
         assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
+    }
+
+    fn alternate_output_error_vecs(mut counter: Local<usize>) -> Result<(), Vec<TestError>> {
+        *counter += 1;
+        if *counter % 2 == 1 {
+            Ok(())
+        } else {
+            Err(vec![TestError, TestError])
+        }
+    }
+
+    fn handle_errors(In(error): In<Vec<TestError>>, mut errors: ResMut<ErrorBucket>) {
+        errors.0.extend(error);
+    }
+
+    // Test that pipe_err preserves out types and can be piped from
+    #[test]
+    fn run_pipe_multiple_errors() {
+        let mut world = World::new();
+        world.init_resource::<ErrorBucket>();
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(alternate_output_error_vecs.pipe_err(handle_errors));
+
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 0);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 2);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 2);
+        schedule.run(&mut world);
+        assert_eq!(world.resource::<ErrorBucket>().0.len(), 4);
+    }
+
+    fn _log_err_compiles() {
+        let mut schedule = Schedule::default();
+
+        schedule.add_systems(|| -> TestResult { Ok(()) }.log_err().in_set(MySystems));
     }
 }

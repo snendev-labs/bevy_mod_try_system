@@ -15,6 +15,9 @@
 //! In this example, we add an error to a bucket every other update.
 //!
 //! ```
+//! use bevy::prelude::*;
+//! use bevy_mod_try_system::*;
+//!
 //! #[derive(Debug)]
 //! struct TestError;
 //!
@@ -38,14 +41,14 @@
 //! fn main() {
 //!     let mut app = App::new();
 //!     app.init_resource::<Bucket>();
-//!     app.add_systems(increment_and_error_if_even.pipe_err(handle_error));
-//!     assert_eq!(app.resource::<Bucket>().0.len(), 0);
+//!     app.add_systems(Update, increment_and_error_if_even.pipe_err(handle_error));
+//!     assert_eq!(app.world.resource::<Bucket>().0.len(), 0);
 //!     app.update();
-//!     assert_eq!(app.resource::<Bucket>().0.len(), 0);
+//!     assert_eq!(app.world.resource::<Bucket>().0.len(), 0);
 //!     app.update();
-//!     assert_eq!(app.resource::<Bucket>().0.len(), 1);
+//!     assert_eq!(app.world.resource::<Bucket>().0.len(), 1);
 //!     app.update();
-//!     assert_eq!(app.resource::<Bucket>().0.len(), 1);
+//!     assert_eq!(app.world.resource::<Bucket>().0.len(), 1);
 //! }
 //! ```
 //!

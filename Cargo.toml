@@ -3,6 +3,7 @@ name = "bevy_mod_try_system"
 version = "0.1.1"
 authors = ["Sean Sullivan <me@snen.dev>"]
 description = "An extension trait for Bevy systems that return Results"
+repository = "https://github.com/snendev-labs/bevy_mod_try_system"
 license = "MIT OR Apache-2.0"
 keywords = ["bevy", "errors", "gamedev", "game", "result"]
 readme = "README.md"

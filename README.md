@@ -1,5 +1,9 @@
 # bevy_mod_try_system
 
+[![Crates.io](https://img.shields.io/crates/v/bevy_mod_try_system.svg)](https://crates.io/crates/bevy_mod_try_system)
+[![Docs](https://docs.rs/bevy_mod_try_system/badge.svg)](https://docs.rs/bevy_mod_try_system/latest/)
+
+
 This crate defines `TrySystemExt`, an extension trait implemented on all `IntoSystem` with `Out = Result<Val, Error>`. It provides a method, `pipe_err`, which accepts `self` and another system (with `In = Error`) as parameters, and returns a `CombinerSystem` (the same vehicle behind `PipeSystem` and the `system.pipe` method) that passes errors from the first system into the second system.
 
 ## Warnings about chained outputs.

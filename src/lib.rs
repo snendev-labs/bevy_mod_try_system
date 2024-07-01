@@ -1,3 +1,56 @@
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+
+//! `bevy_mod_try_system` provides an extension trait for bevy systems that output `Result` types
+//! which can distinctly pipe Err and Ok values to separate output systems.
+//!
+//! This is achieved via the `system.pipe_err(err_system)` method, which passes `Err` variants as
+//! input to the `err_system` system, and passes `Ok` variants to subsequent `pipe` calls.
+//!
+//! In particular, this is useful for managing application-level error context. Since the most
+//! common (at least to start) error handling technique might be "log the error", a utility `log_err`
+//! for calling `bevy::log::error!` on on any `Err` results is also provided.
+//!
+//! ## Example
+//!
+//! In this example, we add an error to a bucket every other update.
+//!
+//! ```
+//! #[derive(Debug)]
+//! struct TestError;
+//!
+//! #[derive(Default, Resource)]
+//! struct Bucket(Vec<TestError>);
+//!
+//! fn increment_and_error_if_even(mut counter: Local<usize>) -> Result<(), TestError> {
+//!     *counter += 1;
+//!     if *counter % 2 == 1 {
+//!         Ok(())
+//!     } else {
+//!         Err(TestError)
+//!     }
+//! }
+//!
+//! fn handle_error(In(error): In<TestError>) {
+//!     // todo: do something with the error
+//! }
+//!
+//! fn run_try_system() {
+//!     let mut app = App::new();
+//!     app.init_resource::<Bucket>();
+//!     app.add_systems(increment_and_error_if_even.pipe_err(handle_error));
+//!     assert_eq!(world.resource::<Bucket>().0.len(), 0);
+//!     app.update();
+//!     assert_eq!(world.resource::<Bucket>().0.len(), 0);
+//!     app.update();
+//!     assert_eq!(world.resource::<Bucket>().0.len(), 1);
+//!     app.update();
+//!     assert_eq!(world.resource::<Bucket>().0.len(), 1);
+//! }
+//! ```
+//!
+//! Consider using or referencing `bevy_anyhow_alerts` to see how to extend this to manage
+//! system- and application-level errors.
+
 use std::{borrow::Cow, marker::PhantomData};
 
 use bevy::{

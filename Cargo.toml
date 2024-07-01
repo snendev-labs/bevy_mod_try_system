@@ -1,6 +1,6 @@
 [package]
 name = "bevy_mod_try_system"
-version = "1.0.0"
+version = "0.1.0"
 authors = ["Sean Sullivan <me@snen.dev>"]
 description = "An extension trait for Bevy systems that return Results"
 license = "MIT OR Apache-2.0"

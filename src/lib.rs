@@ -1,14 +1,14 @@
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 //! `bevy_mod_try_system` provides an extension trait for bevy systems that output `Result` types
-//! which can distinctly pipe Err and Ok values to separate output systems.
+//! which can distinctly pipe `Err` and `Ok` values to separate output systems.
 //!
 //! This is achieved via the `system.pipe_err(err_system)` method, which passes `Err` variants as
 //! input to the `err_system` system, and passes `Ok` variants to subsequent `pipe` calls.
 //!
 //! In particular, this is useful for managing application-level error context. Since the most
 //! common (at least to start) error handling technique might be "log the error", a utility `log_err`
-//! for calling `bevy::log::error!` on on any `Err` results is also provided.
+//! method, which calls `bevy::log::error!` on any `Err` results, is also provided.
 //!
 //! ## Example
 //!
@@ -21,6 +21,7 @@
 //! #[derive(Default, Resource)]
 //! struct Bucket(Vec<TestError>);
 //!
+//! // N.B. We could use `?` in this system, which is convenient.
 //! fn increment_and_error_if_even(mut counter: Local<usize>) -> Result<(), TestError> {
 //!     *counter += 1;
 //!     if *counter % 2 == 1 {
@@ -30,21 +31,21 @@
 //!     }
 //! }
 //!
-//! fn handle_error(In(error): In<TestError>) {
-//!     // todo: do something with the error
+//! fn handle_error(In(error): In<TestError>, mut bucket: ResMut<Bucket>) {
+//!     bucket.0.push(error);
 //! }
 //!
-//! fn run_try_system() {
+//! fn main() {
 //!     let mut app = App::new();
 //!     app.init_resource::<Bucket>();
 //!     app.add_systems(increment_and_error_if_even.pipe_err(handle_error));
-//!     assert_eq!(world.resource::<Bucket>().0.len(), 0);
+//!     assert_eq!(app.resource::<Bucket>().0.len(), 0);
 //!     app.update();
-//!     assert_eq!(world.resource::<Bucket>().0.len(), 0);
+//!     assert_eq!(app.resource::<Bucket>().0.len(), 0);
 //!     app.update();
-//!     assert_eq!(world.resource::<Bucket>().0.len(), 1);
+//!     assert_eq!(app.resource::<Bucket>().0.len(), 1);
 //!     app.update();
-//!     assert_eq!(world.resource::<Bucket>().0.len(), 1);
+//!     assert_eq!(app.resource::<Bucket>().0.len(), 1);
 //! }
 //! ```
 //!
@@ -69,7 +70,7 @@ pub type LogErrorsSystem<S, In, Out, Err, Marker> =
 ///
 /// Implemented for functions and closures that convert into [`System<Out=Result<R,E>`](System).
 ///
-/// See similar implementations in the Bevy documentation https://github.com/bevyengine/bevy/blob/main/crates/bevy_ecs/src/schedule/condition.rs#L1240.
+/// See similar implementations in the Bevy documentation <https://github.com/bevyengine/bevy/blob/main/crates/bevy_ecs/src/schedule/condition.rs#L1240>.
 pub trait TrySystemExt<In, Out, Err, M1>
 where
     Out: Send + Sync + 'static,

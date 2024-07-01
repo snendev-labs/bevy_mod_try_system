@@ -53,9 +53,9 @@
 
 use std::{borrow::Cow, marker::PhantomData};
 
-use bevy::{
-    ecs::system::{AdapterSystem, CombinatorSystem, Combine},
+use bevy_ecs::{
     prelude::{IntoSystem, System},
+    system::{AdapterSystem, CombinatorSystem, Combine},
 };
 
 /// A CombinatorSystem for systems that return Results and handle errors.
@@ -100,7 +100,7 @@ where
 
 fn log_error<R, E: std::fmt::Debug>(result: Result<R, E>) {
     if let Err(error) = result {
-        bevy::log::error!("{error:?}");
+        bevy_log::error!("{error:?}");
     }
 }
 
@@ -150,7 +150,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use bevy::ecs::prelude::*;
+    use bevy_ecs::prelude::*;
 
     use super::*;
 
@@ -247,7 +247,7 @@ mod tests {
     }
 
     fn make_fallback_output<E: std::fmt::Debug>(In(error): In<E>) -> Output {
-        bevy::log::error!("{error:?}");
+        bevy_log::error!("{error:?}");
         Output::Fallback1
     }
 
@@ -297,7 +297,7 @@ mod tests {
     }
 
     fn make_fallback_string(In(error): In<String>) -> Output {
-        bevy::log::error!("{error:?}");
+        bevy_log::error!("{error:?}");
         Output::Fallback1
     }
 
@@ -355,7 +355,7 @@ mod tests {
     }
 
     fn make_fallback_result<E: std::fmt::Debug>(In(error): In<E>) -> TestOutputResult {
-        bevy::log::error!("{error:?}");
+        bevy_log::error!("{error:?}");
         Ok(Output::Fallback2)
     }
 
@@ -398,7 +398,7 @@ mod tests {
     }
 
     fn make_fallback_option<E: std::fmt::Debug, T>(In(error): In<E>) -> Option<T> {
-        bevy::log::error!("{error:?}");
+        bevy_log::error!("{error:?}");
         None
     }
 

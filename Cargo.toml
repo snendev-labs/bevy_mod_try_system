@@ -9,4 +9,5 @@ readme = "README.md"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.13", default-features = false }
+bevy_ecs = { version = "0.13", default-features = false }
+bevy_log = { version = "0.13", default-features = false }
